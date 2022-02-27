@@ -2,12 +2,15 @@
 
 ## Mission
 [X] Build a Kubernetes cluster using Terraform.
+
 [X] Deploy Vault 
+
 [X] with auto-unseal capabilities enabled 
+
 [_]and implement a cloud Dynamic Secrets Engine which is leveraged by Terraform for
 automating deployments of cloud infrastructure
-[_] Bonus: Demonstrate how this could be integrated with a CI/CD
-pipeline
+
+[_] Bonus: Demonstrate how this could be integrated with a CI/CD pipeline
 
 ## Setup
 ### Directory structure
