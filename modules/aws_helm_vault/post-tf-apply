@@ -42,3 +42,59 @@ sleep 15
 kubectl -n demo exec vault-0 -- vault login $(kubectl -n demo get secret hashivault -o json | jq -r '.data.root_token' | base64 -d)
 kubectl -n demo exec vault-0 -- vault operator raft list-peers
 
+#
+# setup AWS engine
+#
+kubectl -n demo exec vault-0 -- vault secrets enable aws
+
+#
+# configure AWS secrets engine
+#
+kubectl -n demo exec vault-0 -- vault write aws/config/root \
+    access_key=$(kubectl -n demo get secret kms-creds -o json | jq -r '.data.AWS_ACCESS_KEY_ID' | base64 -d) \
+    secret_key=$(kubectl -n demo get secret kms-creds -o json | jq -r '.data.AWS_SECRET_ACCESS_KEY' | base64 -d) \
+    region=us-west-1
+
+#
+# create test my-role
+#
+kubectl -n demo exec vault-0 -- vault write aws/roles/my-role \
+    credential_type=iam_user \
+    policy_document=-<<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "ec2:*",
+      "Resource": "*"
+    }
+  ]
+}
+EOF
+
+#
+# create test my-other-role
+#
+vault write aws/roles/my-other-role \
+    policy_arns=arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess,arn:aws:iam::aws:policy/IAMReadOnlyAccess \
+    iam_groups=group1,group2 \
+    credential_type=iam_user \
+    policy_document=-<<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "ec2:*",
+      "Resource": "*"
+    }
+  ]
+}
+EOF
+
+#
+# Generate AWS creds for my-role
+#
+kubectl -n demo exec vault-0 -- vault read aws/creds/my-role
+
