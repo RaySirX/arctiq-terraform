@@ -1,0 +1,8 @@
+#!/bin/bash
+
+eksctl create cluster \
+    --name=arctiq-eks \
+    --region=us-east-1 \
+    --zones=us-east-1a,us-east-1b,us-east-1c \
+    --node-type=t4g.large \
+    --nodes=3
