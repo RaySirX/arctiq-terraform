@@ -1,37 +1,51 @@
 # Arctiq Vault Demo
 
 ## Mission
-- Build a Kubernetes cluster using Terraform.
-- Deploy Vault with auto-unseal capabilities enabled and implement a
-cloud Dynamic Secrets Engine which is leveraged by Terraform for
+[X] Build a Kubernetes cluster using Terraform.
+[X] Deploy Vault 
+[X] with auto-unseal capabilities enabled 
+[_]and implement a cloud Dynamic Secrets Engine which is leveraged by Terraform for
 automating deployments of cloud infrastructure
-- Bonus: Demonstrate how this could be integrated with a CI/CD
+[_] Bonus: Demonstrate how this could be integrated with a CI/CD
 pipeline
 
 ## Setup
-### Terraform backend
+### Directory structure
+deploy - root level terraform
+modules - modular eks and vault
+extras - keep the dir clean of stuff
 
-Some backends required user:pass embedded into connection ...
-```
-terraform {
-  backend "pg" {
-    conn_str = "postgres://postgres:SECRET_IN_PLAIN_TEXT@tower.home/terraform?sslmode=disable"
-  }
-}
-```
+### Extenal access requirements
+deploy/*/00-workspaces.tf
+- aws_credential - point to AWS credentials file
+- k8s_config_path - eksctl will modify kube config for PC access
 
-Symlink to it
-```
-ln -s ~/.ssh/.ssh/terraform_postrgress_backend.tf eks/backend.tf
-ln -s ~/.ssh/.ssh/terraform_postrgress_backend.tf vault/backend.tf
-```
+deploy/*/01_backend_s3.tf - state file
 
-Ignore symlinks
-```
-find . -name "backend.tf" -type l | sed -e s'/^\.\///g' >> .gitignore
-```
+## Run it
+cd deploy/eks
+terraform init
+terraform workspace new eks-demo
+terraform plan -out eks.plan
+terraform apply eks.plan
 
-### Quick EKS
+cd deploy/vault
+terraform init
+terraform workspace new vault-demo
+terraform plan -out vault.plan
+terraform apply vault.plan
+
+## Terraform post vault setup - modules/aws_helm_vault/post-tf-apply
+post-tf-apply script "should" run post EKS deploy
+- initialize vault
+-- kubes:/demo/hashivault secret - stores the root_token and recovery keys
+-- kubes:/demo/kms-creds secret - auto-unseal - aws creds vault will use to fetch master key from KMS
+- dynamically add vaults to cluster
+- sanity check
+-- login to vault-0 using stored root token
+-- display raft cluster state
+
+## Quick AWS EKS
 ```
 curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
 sudo mv /tmp/eksctl /usr/local/bin
@@ -45,6 +59,7 @@ eksctl create cluster \
 
 https://learn.hashicorp.com/tutorials/vault/kubernetes-amazon-eks?in=vault/kubernetes
 
+## Quick Vault
 helm repo add hashicorp https://helm.releases.hashicorp.com
 
 helm install vault hashicorp/vault \
