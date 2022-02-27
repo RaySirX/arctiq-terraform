@@ -1,0 +1,44 @@
+#!/bin/bash -x
+#
+# grab AWS creds for auto unsealing using KMS 
+#
+kubectl -n demo create secret generic kms-creds \
+    --from-literal=AWS_ACCESS_KEY_ID="$(<~/.aws/credentials egrep "^aws_access_key_id" | cut -d' ' -f3)" \
+    --from-literal=AWS_SECRET_ACCESS_KEY="$(<~/.aws/credentials egrep "^aws_secret_access_key" | cut -d' ' -f3)"
+
+#
+# Initialize and unseal vault-0
+#
+kubectl -n demo exec vault-0 -- vault operator init \
+    -key-shares=5 \
+    -key-threshold=3 \
+    -format=json > cluster-keys.json
+
+#
+# Store keys in kubes
+#
+kubectl -n demo create secret generic hashivault \
+  --from-literal=unseal_keys="$(<cluster-keys.json jq -r '.recovery_keys_b64[]')" \
+  --from-literal=root_token="$(<cluster-keys.json jq -r '.root_token')"
+
+#
+# Delete the file... if you dare
+#
+rm cluster-keys.json
+
+sleep 10
+
+#
+# Join the nodes
+#
+kubectl -n demo exec vault-1 -- vault operator raft join http://vault-0.vault-internal:8200
+kubectl -n demo exec vault-2 -- vault operator raft join http://vault-0.vault-internal:8200
+
+sleep 10
+
+#
+# Sanity Checks
+# 
+kubectl -n demo exec vault-0 -- vault login $(kubectl -n demo get secret hashivault -o json | jq -r '.data.root_token' | base64 -d)
+kubectl -n demo exec vault-0 -- vault operator raft list-peers
+
