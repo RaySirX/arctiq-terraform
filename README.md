@@ -122,3 +122,28 @@ Error: uninstallation completed with 1 error(s): uninstall: Failed to purge the 
 
 ## terraform helm provider does not delete PVCs
 kubectl -n demo delete pvc --all
+
+# AWS secrets engine
+```
+vault write aws/roles/my-role \
+    credential_type=iam_user \
+    policy_document=-<<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "ec2:*",
+      "Resource": "*"
+    }
+  ]
+}
+EOF
+```
+```
+kubectl -n demo exec vault-0 -- vault read -format=json aws/creds/my-role | tee my-role.aws
+export AWS_SECRET_ACCESS_KEY=$(<my-role.aws jq -r '.data.secret_key')
+export AWS_ACCESS_KEY_ID=$(<my-role.aws jq -r '.data.access_key')
+aws ec2 describe-instances
+```
+
